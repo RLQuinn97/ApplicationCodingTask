@@ -32,6 +32,56 @@ namespace SympliTaskUnitTests
             Assert.IsTrue(response.Success);
         }
         [TestMethod]
+        public void TestGoogleCachedResult()
+        {
+
+            var mockContext = new Microsoft.AspNetCore.Http.DefaultHttpContext();
+
+            mockContext.Request.Headers.Add("searchString", "e-Settlements");
+            mockContext.Request.Headers.Add("targetUrl", "www.sympli.com.au");
+            mockContext.Request.Headers.Add("resultsCount", "100");
+            mockContext.Request.Headers.Add("engineTypeId", $"{(int)SearchEngineType.Google}");
+
+            var ctl = new SEOSearchController() { ControllerContext = new Microsoft.AspNetCore.Mvc.ControllerContext() { HttpContext = mockContext } };
+
+            var response = ctl.Get();
+            System.Threading.Thread.Sleep(1000);
+            var secondResponse = ctl.Get();
+
+            Assert.IsTrue(response.Success && secondResponse.Success && secondResponse.SearchDate == response.SearchDate);
+        }
+        [TestMethod]
+        public void TestSeparateGoogleResults()
+        {
+
+            var mockContext = new Microsoft.AspNetCore.Http.DefaultHttpContext();
+
+            mockContext.Request.Headers.Add("searchString", "e-Settlements");
+            mockContext.Request.Headers.Add("targetUrl", "www.sympli.com.au");
+            mockContext.Request.Headers.Add("resultsCount", "100");
+            mockContext.Request.Headers.Add("engineTypeId", $"{(int)SearchEngineType.Google}");
+
+            var ctl = new SEOSearchController() { ControllerContext = new Microsoft.AspNetCore.Mvc.ControllerContext() { HttpContext = mockContext } };
+
+            var response = ctl.Get();
+            System.Threading.Thread.Sleep(1000);
+
+            var mockContext2 = new Microsoft.AspNetCore.Http.DefaultHttpContext();
+
+            mockContext2.Request.Headers.Add("searchString", "Digital Settlements");
+            mockContext2.Request.Headers.Add("targetUrl", "www.sympli.com.au");
+            mockContext2.Request.Headers.Add("resultsCount", "100");
+            mockContext2.Request.Headers.Add("engineTypeId", $"{(int)SearchEngineType.Google}");
+
+            ctl.ControllerContext = new Microsoft.AspNetCore.Mvc.ControllerContext() { HttpContext = mockContext2 };
+
+            var secondResponse = ctl.Get();
+
+            Assert.IsTrue(response.Success && secondResponse.Success && secondResponse.SearchDate != response.SearchDate);
+        }
+
+        //issue: Javascript not executing. I would typically use Selenium / PhantomJS to execute DOM functions to get the full results, but the task spec required no external packages.
+        [TestMethod]
         public void TestBingSearchSuccess()
         {
 

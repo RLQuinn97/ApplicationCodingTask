@@ -31,6 +31,25 @@ namespace SympliTaskBackend.Controllers
             _logger = logger;
         }
 
+        private List<SEOSearchEntity> _resultsCache = new List<SEOSearchEntity>();
+        
+        public List<SEOSearchEntity> ResultsCache
+        {
+            get
+            {
+                if(_resultsCache == null)
+                {
+                    _resultsCache = new List<SEOSearchEntity>();
+                }
+                _resultsCache = _resultsCache.Where(o => (DateTime.UtcNow - o.SearchDate).TotalHours < 1)?.ToList();
+                return _resultsCache;
+            }
+            set
+            {
+                _resultsCache = value.Where(o => (DateTime.UtcNow - o.SearchDate).TotalHours < 1)?.ToList();
+            }
+        }
+
         //this could be defined serverside so that engines with basic mapping could be added on the fly - for this version I'm adding it here
         public List<SearchEngineMapper> EngineMappers = new List<SearchEngineMapper>()
         {
@@ -87,19 +106,46 @@ namespace SympliTaskBackend.Controllers
             }
         }
 
+
         /// <summary>
         /// 
         /// </summary>
-        /// <returns></returns>
+        /// <param name="mapper"></param>
+        /// <param name="searchString"></param>
+        /// <param name="targetUrl"></param>
+        /// <param name="resultsToCheck"></param>
+        /// <returns>
+        /// SEOSearchEntity:
+        /// - Success: true/false depending on whether search results could be loaded and checked
+        /// - SearchDate : The UTC datetime the search was executed, if search successful then this could be used for caching to determine when a new result should be obtained
+        /// - EngineName : The name of the pre-defined search engine being checked.
+        /// - SearchKeywords: The string being searched for - i.e. "e-Settlements"
+        /// - SearchURL: The URL that is being searched for in the results - i.e. "sympli.com.au" 
+        /// - Rankings: Comma separated list of each ranking where the target URL is found in the search results
+        /// - ResultCount: Number of results obtained from the search execution
+        /// - MatchCount: The number of results found matching the search URL
+        /// </returns>
         public SEOSearchEntity GetSearchResults(SearchEngineMapper mapper, string searchString, string targetUrl, int resultsToCheck)
         {
             var result = new SEOSearchEntity() { EngineName = Enum.GetName(typeof(SearchEngineType), mapper.Engine) };
 
-           
-            string searchUrl = mapper.BaseUrl.Replace(ResultCountPlaceholder, resultsToCheck.ToString())
+            //todo: Regex to improve cleaning of user input of url to search for
+            targetUrl = targetUrl.ToLower().Replace("http://", "").Replace("https://", "").Replace("www.", "");
+
+            // if we have a result within the last hour of cached results, return that instead.
+            var cachedResult = ResultsCache.FirstOrDefault(c => c.EngineType == mapper.Engine && c.SearchURL.ToUpper() == targetUrl.ToUpper() && c.SearchKeywords.ToUpper() == searchString.ToUpper() && c.ResultCount == resultsToCheck);
+
+            if(cachedResult != null)
+            {
+                return cachedResult;
+            }
+
+
+            //Construct the search URL - most search engines have a fairly similar format of search url - with encoded search string and number of results in particular places in the string.
+            string searchEngineUrl = mapper.BaseUrl.Replace(ResultCountPlaceholder, resultsToCheck.ToString())
                 .Replace(SearchTextPlaceholder, WebUtility.UrlEncode(searchString.ToString()));
             
-            HttpWebRequest request = (HttpWebRequest)WebRequest.Create(searchUrl);
+            HttpWebRequest request = (HttpWebRequest)WebRequest.Create(searchEngineUrl);
 
             string htmlResponse = "";
             HttpWebResponse response = new HttpWebResponse();
@@ -134,6 +180,7 @@ namespace SympliTaskBackend.Controllers
             //A performance improvement here would be proper Regex matching
             if (!string.IsNullOrEmpty(htmlResponse) && htmlResponse.Contains("<body"))
             {
+                //to ignore stylesheet
                 htmlResponse = htmlResponse.Substring(htmlResponse.IndexOf("<body"));
             }
             else
@@ -159,10 +206,6 @@ namespace SympliTaskBackend.Controllers
 
                 urls = urls.Where(u => !String.IsNullOrEmpty(u)).ToList();
 
-
-                //todo: Regex to improve cleaning of user input of url to search for
-                targetUrl = targetUrl.ToLower().Replace("http://", "").Replace("https://", "").Replace("www.", "");
-
                 result.ResultCount = urls.Count;
 
                 List<int> matchRankings = new List<int>();
@@ -186,6 +229,8 @@ namespace SympliTaskBackend.Controllers
                 result.Rankings = String.Join(", ", matchRankings);
                 result.MatchCount = matchRankings.Count();
                 result.Success = true;
+                result.EngineType = mapper.Engine;
+                _resultsCache.Add(result);
 
             }
             if(result.ResultCount == 0)

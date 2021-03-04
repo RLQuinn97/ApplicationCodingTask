@@ -4,6 +4,7 @@ namespace SympliTaskBackend.Entities
 {
     public class SEOSearchEntity
     {
+        public SearchEngineType EngineType { get; set; }
         public string EngineName { get; set; }
         public DateTime SearchDate { get; set; }
         public string SearchKeywords { get; set; }
@@ -22,7 +23,6 @@ namespace SympliTaskBackend.Entities
         Google,
         Bing,
         Yahoo,
-        DuckDuckGo
     }
 
     public class SearchEngineMapper
