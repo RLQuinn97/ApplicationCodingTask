@@ -17,10 +17,11 @@ namespace SympliTaskBackend.Controllers
     [Route("api/getSEOResult")]
     public class SEOSearchController : ControllerBase
     {
-
+        #region Constants
         const string ResultCountPlaceholder = "{{numResults}}";
         const string SearchTextPlaceholder = "{{formattedSearch}}";
-
+        #endregion
+        #region Static Helpers
         ILogger<SEOSearchController> _logger;
         public SEOSearchController()
         {
@@ -32,7 +33,8 @@ namespace SympliTaskBackend.Controllers
         }
 
         private List<SEOSearchEntity> _resultsCache = new List<SEOSearchEntity>();
-        
+        //Handles caching of results as long as the webservice is alive. Clears results from more than an hour before when adding / obtaining results.
+        //Todo: Move out of controller for class since this will only persist as long as the current http context does - needs to be serverside
         public List<SEOSearchEntity> ResultsCache
         {
             get
@@ -50,6 +52,7 @@ namespace SympliTaskBackend.Controllers
             }
         }
 
+        //Contains mapping details for pre-defined search engines that can be checked
         //this could be defined serverside so that engines with basic mapping could be added on the fly - for this version I'm adding it here
         public List<SearchEngineMapper> EngineMappers = new List<SearchEngineMapper>()
         {
@@ -58,7 +61,7 @@ namespace SympliTaskBackend.Controllers
             new SearchEngineMapper(){ Engine = SearchEngineType.Bing, BaseUrl = "http://www.bing.com/search?q={{formattedSearch}}&count={{numResults}}", SearchTag = "b_attribution" }
         };
 
-
+        #endregion
         /// <summary>
         /// Gets SEO results for the following required headers:
         /// <param name="searchString"> STRING: The text to execute the search for - i.e. e-Settlements </param>
@@ -108,7 +111,8 @@ namespace SympliTaskBackend.Controllers
 
 
         /// <summary>
-        /// 
+        /// Based on parameters in a SearchEngineMapper, get the first {{resultsToCheck}} results from a specified search engine, searching for a specified {{searchString}},
+        /// looking for matches for a {{targetUrl}}
         /// </summary>
         /// <param name="mapper"></param>
         /// <param name="searchString"></param>
@@ -188,6 +192,7 @@ namespace SympliTaskBackend.Controllers
                 throw new WebException("Search Results could not be loaded - no HTML body found", WebExceptionStatus.UnknownError);
             }
             
+            
             if (htmlResponse?.Contains(mapper.SearchTag) == true)
             {
                 List<string> urls = new List<string>();
@@ -230,10 +235,12 @@ namespace SympliTaskBackend.Controllers
                 result.MatchCount = matchRankings.Count();
                 result.Success = true;
                 result.EngineType = mapper.Engine;
+
                 _resultsCache.Add(result);
 
+                return result;
             }
-            if(result.ResultCount == 0)
+            if (result.ResultCount == 0)
             {
                 result.ErrorMessage = $"Found no instances of search tag: {mapper.SearchTag}";
             }
