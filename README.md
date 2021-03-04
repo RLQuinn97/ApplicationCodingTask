@@ -1,5 +1,5 @@
-# SympliTask
-Coding Task for Sympli Application
+# ApplicationCodingTask
+Coding Task for Coding Task for Job Application
 
 - API functionality is in SympliTaskBackend.Controllers
 - Unit Tests are in SympliTaskUnitTests.SEOSearchTests.cs
